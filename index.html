@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Compressed Restaurant Rankings</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div id="header">
+  <h1 id="title">Loading…</h1>
+  <div id="asof"></div>
+  <p id="description"></p>
+  <div id="city-switcher"></div>
+  <div id="type-toggle"></div>
+</div>
+
+<div id="map-section">
+  <div class="section-label">Top 10 by value</div>
+  <div id="map"></div>
+</div>
+
+<div id="board-section">
+  <div class="section-label">Full ranking <span id="board-count"></span></div>
+  <div id="board"></div>
+</div>
+
+<div id="legend">
+  <div class="legend-section">Price tier</div>
+  <div class="legend-row"><span class="legend-swatch" style="background:#9cc9a7"></span>$ — cheap eats</div>
+  <div class="legend-row"><span class="legend-swatch" style="background:#e7cf86"></span>$$ — moderate</div>
+  <div class="legend-row"><span class="legend-swatch" style="background:#e8af86"></span>$$$ — pricey</div>
+  <div class="legend-row"><span class="legend-swatch" style="background:#e0909e"></span>$$$$ — splurge</div>
+  <div class="legend-section">Score</div>
+  <div class="legend-row legend-note">The number (and the bar length) is the value score, 0 to 100. The bar color is the price tier. Higher score = better value. Click any restaurant to view its location on the map.</div>
+</div>
+
+<a id="site-link" href="https://debrajghose.com" target="_blank" rel="noopener">debrajghose.com</a>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<!-- Register one city per script. Each does `window.CITIES.<id> = {...}`. -->
+<script src="data/sanfrancisco.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
