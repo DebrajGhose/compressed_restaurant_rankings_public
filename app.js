@@ -141,17 +141,21 @@
       total.toLocaleString() + " " + activeLabel() + ", best value first";
   }
 
-  // ---- map of the top 10 --------------------------------------------------
+  // ---- map: top 10 of whatever area is in view -----------------------------
+  // The pins always show the 10 best-ranked spots inside the CURRENT viewport,
+  // recomputed on every pan/zoom (zoom into a neighborhood to see its own top 10).
+  // Pin numbers are the citywide rank, so they match the list below, which never
+  // changes with the map.
   var mapObj = null;
   function buildMap() {
     var el = document.getElementById("map");
     if (typeof L === "undefined" || !el) return;        // Leaflet not loaded (offline)
-    var top = (city._byType[activeType] || []).filter(function (r) {
+    var all = (city._byType[activeType] || []).filter(function (r) {
       return typeof r.lat === "number" && typeof r.lng === "number";
-    }).slice(0, 10);
+    });                                                  // already rank-ordered
 
     if (mapObj) { mapObj.remove(); mapObj = null; }
-    if (!top.length) { el.innerHTML = "<div style='padding:16px;color:#737373;font-size:13px'>No coordinates in the data yet.</div>"; return; }
+    if (!all.length) { el.innerHTML = "<div style='padding:16px;color:#737373;font-size:13px'>No coordinates in the data yet.</div>"; setMapNote(""); return; }
     el.innerHTML = "";
 
     mapObj = L.map(el, { scrollWheelZoom: false, attributionControl: true });
@@ -160,20 +164,38 @@
       attribution: '&copy; OpenStreetMap &copy; CARTO'
     }).addTo(mapObj);
 
-    var pts = [];
-    top.forEach(function (r) {
-      var color = PRICE_COLORS[r.price] || "#bdbdbd";
-      var icon = L.divIcon({
-        className: "",
-        html: "<div class='pin' style='background:" + color + "'><b>" + r.rank + "</b></div>",
-        iconSize: [26, 26], iconAnchor: [13, 26], tooltipAnchor: [0, -24]
+    var markers = L.layerGroup().addTo(mapObj);
+
+    function updateMarkers() {
+      var bounds = mapObj.getBounds();
+      var inView = all.filter(function (r) { return bounds.contains([r.lat, r.lng]); }).slice(0, 10);
+      markers.clearLayers();
+      inView.forEach(function (r) {
+        var color = PRICE_COLORS[r.price] || "#bdbdbd";
+        var icon = L.divIcon({
+          className: "",
+          html: "<div class='pin' style='background:" + color + "'><b>" + r.rank + "</b></div>",
+          iconSize: [26, 26], iconAnchor: [13, 26], tooltipAnchor: [0, -24]
+        });
+        var m = L.marker([r.lat, r.lng], { icon: icon }).addTo(markers);
+        m.bindTooltip(r.rank + ". " + r.name + " · " + Math.round(r.score) + "/100", { className: "pin-label", direction: "top", permanent: true, opacity: 0.95 });
+        m.on("click", function () { window.open(placeLink(r), "_blank", "noopener"); });
       });
-      var m = L.marker([r.lat, r.lng], { icon: icon }).addTo(mapObj);
-      m.bindTooltip(r.rank + ". " + r.name, { className: "pin-label", direction: "top", permanent: true, opacity: 0.95 });
-      m.on("click", function () { window.open(placeLink(r), "_blank", "noopener"); });
-      pts.push([r.lat, r.lng]);
-    });
-    mapObj.fitBounds(pts, { padding: [40, 40] });
+      if (!inView.length) setMapNote("no ranked spots in view — zoom out");
+      else if (inView.length < 10) setMapNote("the " + inView.length + " best in view — pan or zoom to explore");
+      else setMapNote("the 10 best in view — pan or zoom to explore");
+    }
+
+    mapObj.on("moveend", updateMarkers);   // fires after every pan/zoom (and fitBounds)
+
+    // start on the citywide top 10
+    mapObj.fitBounds(all.slice(0, 10).map(function (r) { return [r.lat, r.lng]; }), { padding: [40, 40] });
+    updateMarkers();
+  }
+
+  function setMapNote(text) {
+    var n = document.getElementById("map-note");
+    if (n) n.textContent = text;
   }
 
   function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]; }); }
