@@ -58,7 +58,16 @@ body{
   display:flex; align-items:center; justify-content:center;
 }
 .pin b{transform:rotate(45deg); color:#11111b; font-size:12px; font-weight:700}
-.leaflet-tooltip.pin-label{font-weight:600; font-size:12px}
+.leaflet-tooltip.pin-label{
+  font-weight:600; font-size:12px;
+  max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+/* a label nudged off its pin to avoid overlap loses its pointer arrow */
+.leaflet-tooltip.pin-label.moved:before{display:none}
+/* narrow screens: smaller labels so more of the ten still fit without overlapping */
+@media (max-width:640px){
+  .leaflet-tooltip.pin-label{max-width:124px; font-size:11px; padding:2px 5px}
+}
 
 /* ---- ranked board ---- */
 #board-section{max-width:1100px}

@@ -170,6 +170,7 @@
       var bounds = mapObj.getBounds();
       var inView = all.filter(function (r) { return bounds.contains([r.lat, r.lng]); }).slice(0, 10);
       markers.clearLayers();
+      var entries = [];
       inView.forEach(function (r) {
         var color = PRICE_COLORS[r.price] || "#bdbdbd";
         var icon = L.divIcon({
@@ -177,13 +178,72 @@
           html: "<div class='pin' style='background:" + color + "'><b>" + r.rank + "</b></div>",
           iconSize: [26, 26], iconAnchor: [13, 26], tooltipAnchor: [0, -24]
         });
-        var m = L.marker([r.lat, r.lng], { icon: icon }).addTo(markers);
+        var m = L.marker([r.lat, r.lng], { icon: icon, title: r.name }).addTo(markers);
         m.bindTooltip(r.rank + ". " + r.name + " · " + Math.round(r.score) + "/100", { className: "pin-label", direction: "top", permanent: true, opacity: 0.95 });
         m.on("click", function () { window.open(placeLink(r), "_blank", "noopener"); });
+        entries.push({ marker: m, r: r });
       });
+      layoutLabels(entries);      // keep the labels from sitting on top of each other
       if (!inView.length) setMapNote("no ranked spots in view — zoom out");
       else if (inView.length < 10) setMapNote("the " + inView.length + " best in view — pan or zoom to explore");
       else setMapNote("the 10 best in view — pan or zoom to explore");
+    }
+
+    // Permanent labels overlap badly once pins cluster. Walk them best-rank first
+    // and nudge each one to the first candidate spot that clears every pin and every
+    // label already placed. Anything with nowhere to go is hidden: its numbered pin
+    // stays put and the name is still available on hover.
+    function layoutLabels(entries) {
+      var box = el.getBoundingClientRect();
+      var taken = [];                         // labels already placed
+
+      var pins = entries.map(function (e) {   // pins block label space too
+        var p = mapObj.latLngToContainerPoint([e.r.lat, e.r.lng]);
+        return { x: p.x - 13, y: p.y - 26, w: 26, h: 26 };
+      });
+
+      entries.forEach(function (e, idx) {
+        var tip = e.marker.getTooltip();
+        var te = tip && tip.getElement();
+        if (!te) return;
+        te.style.marginLeft = "0px";
+        te.style.marginTop = "0px";
+        te.style.visibility = "";
+        te.classList.remove("moved");
+
+        var r0 = te.getBoundingClientRect();
+        var base = { x: r0.left - box.left, y: r0.top - box.top, w: r0.width, h: r0.height };
+        // search outward in rings: straight up first, then the sides and diagonals
+        var stepY = base.h + 6, stepX = base.w / 2 + 20;
+        var cands = [[0, 0]];
+        [1, 1.6, 2.3, 3.1, 4].forEach(function (k) {
+          var rx = stepX * k, ry = stepY * k;
+          cands.push([0, -ry], [0, ry + 26], [-rx, 26], [rx, 26],
+                     [-rx, 26 - ry], [rx, 26 - ry], [-rx, 26 + ry], [rx, 26 + ry]);
+        });
+
+        for (var i = 0; i < cands.length; i++) {
+          var c = { x: base.x + cands[i][0], y: base.y + cands[i][1], w: base.w, h: base.h };
+          if (c.x < 2 || c.y < 2 || c.x + c.w > box.width - 2 || c.y + c.h > box.height - 2) continue;
+          if (overlaps(c, taken) || overlaps(c, pins, idx)) continue;   // skip its own pin
+          te.style.marginLeft = cands[i][0] + "px";
+          te.style.marginTop = cands[i][1] + "px";
+          if (i > 0) te.classList.add("moved");   // drop the pointer arrow once moved
+          taken.push(c);
+          return;
+        }
+        te.style.visibility = "hidden";
+      });
+    }
+
+    function overlaps(a, list, skip) {
+      for (var i = 0; i < list.length; i++) {
+        if (i === skip) continue;
+        var b = list[i];
+        if (a.x < b.x + b.w + 3 && a.x + a.w + 3 > b.x &&
+            a.y < b.y + b.h + 3 && a.y + a.h + 3 > b.y) return true;
+      }
+      return false;
     }
 
     mapObj.on("moveend", updateMarkers);   // fires after every pan/zoom (and fitBounds)
