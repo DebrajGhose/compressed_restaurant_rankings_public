@@ -26,6 +26,15 @@
   var board = document.getElementById("board");
   var city;                       // current city object
   var activeType = "meal";        // default view: proper meals
+  var punishPrice = true;         // ON by default; off ranks on rating quality alone
+
+  // Every restaurant carries two finished rankings: score/rank (price penalty applied)
+  // and scoreNP/rankNP (penalty off). The toggle just picks which pair to show.
+  function scoreOf(r) { return (!punishPrice && typeof r.scoreNP === "number") ? r.scoreNP : r.score; }
+  function rankOf(r)  { return (!punishPrice && typeof r.rankNP  === "number") ? r.rankNP  : r.rank; }
+  function rowsFor(type) {
+    return (city._byType[type] || []).slice().sort(function (a, b) { return rankOf(a) - rankOf(b); });
+  }
 
   // ---- setup ---------------------------------------------------------------
   function loadCity(id) {
@@ -52,8 +61,29 @@
 
   function render() {
     buildTypeToggle();   // refresh active-button styling
+    buildPriceToggle();
     buildBoard();
     buildMap();
+  }
+
+  // ---- "punish by price" switch --------------------------------------------
+  function buildPriceToggle() {
+    var box = document.getElementById("price-toggle");
+    if (!box) return;
+    box.innerHTML = "";
+    var b = document.createElement("button");
+    b.className = "switch-btn" + (punishPrice ? " on" : "");
+    b.setAttribute("role", "switch");
+    b.setAttribute("aria-checked", punishPrice ? "true" : "false");
+    b.innerHTML = "<span class='track'><span class='knob'></span></span>Punish by price";
+    b.onclick = function () { punishPrice = !punishPrice; render(); };
+    box.appendChild(b);
+    var note = document.createElement("span");
+    note.className = "switch-note";
+    note.textContent = punishPrice
+      ? "on: costing more than the quality justifies pulls a place down"
+      : "off: ranked on rating alone, whatever it costs";
+    box.appendChild(note);
   }
 
   function buildSwitcher() {
@@ -101,7 +131,7 @@
 
   // ---- the ranked board ----------------------------------------------------
   function buildBoard() {
-    var rows = city._byType[activeType] || [];
+    var rows = rowsFor(activeType);
     var total = rows.length;
     var frag = document.createDocumentFragment();
 
@@ -117,20 +147,20 @@
       // value bar behind the content (width = value score)
       var bar = document.createElement("div");
       bar.className = "row-bar";
-      bar.style.width = r.score + "%";
+      bar.style.width = scoreOf(r) + "%";
       bar.style.background = color;
       row.appendChild(bar);
 
       var content = document.createElement("div");
       content.className = "row-content";
       content.innerHTML =
-        "<div class='rank'><b>" + r.rank + "</b><span>/" + total + "</span></div>" +
+        "<div class='rank'><b>" + rankOf(r) + "</b><span>/" + total + "</span></div>" +
         "<div class='info'>" +
           "<span class='name'>" + esc(r.name) + "</span>" +
           "<span class='chip' style='background:" + color + "'>" + "$".repeat(r.price) + "</span>" +
           "<span class='go'>view location ↗</span>" +
         "</div>" +
-        "<div class='score'>" + Math.round(r.score) + "<span>/100</span></div>";
+        "<div class='score'>" + Math.round(scoreOf(r)) + "<span>/100</span></div>";
       row.appendChild(content);
       frag.appendChild(row);
     });
@@ -150,9 +180,9 @@
   function buildMap() {
     var el = document.getElementById("map");
     if (typeof L === "undefined" || !el) return;        // Leaflet not loaded (offline)
-    var all = (city._byType[activeType] || []).filter(function (r) {
+    var all = rowsFor(activeType).filter(function (r) {   // ordered by the active ranking
       return typeof r.lat === "number" && typeof r.lng === "number";
-    });                                                  // already rank-ordered
+    });
 
     if (mapObj) { mapObj.remove(); mapObj = null; }
     if (!all.length) { el.innerHTML = "<div style='padding:16px;color:#737373;font-size:13px'>No coordinates in the data yet.</div>"; setMapNote(""); return; }
@@ -175,11 +205,11 @@
         var color = PRICE_COLORS[r.price] || "#bdbdbd";
         var icon = L.divIcon({
           className: "",
-          html: "<div class='pin' style='background:" + color + "'><b>" + r.rank + "</b></div>",
+          html: "<div class='pin' style='background:" + color + "'><b>" + rankOf(r) + "</b></div>",
           iconSize: [26, 26], iconAnchor: [13, 26], tooltipAnchor: [0, -24]
         });
         var m = L.marker([r.lat, r.lng], { icon: icon, title: r.name }).addTo(markers);
-        m.bindTooltip(r.rank + ". " + r.name + " · " + Math.round(r.score) + "/100", { className: "pin-label", direction: "top", permanent: true, opacity: 0.95 });
+        m.bindTooltip(rankOf(r) + ". " + r.name + " · " + Math.round(scoreOf(r)) + "/100", { className: "pin-label", direction: "top", permanent: true, opacity: 0.95 });
         m.on("click", function () { window.open(placeLink(r), "_blank", "noopener"); });
         entries.push({ marker: m, r: r });
       });

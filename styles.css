@@ -39,6 +39,27 @@ body{
 .type-btn.active{background:var(--ink); color:#fff}
 .type-btn.active span{color:#c9c9c9}
 
+/* ---- "punish by price" switch ---- */
+#price-toggle{margin-top:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.switch-btn{
+  display:inline-flex; align-items:center; gap:9px;
+  background:#fff; color:var(--ink); border:1px solid var(--hair);
+  border-radius:999px; padding:6px 15px 6px 9px; cursor:pointer;
+  font-size:13.5px; font-weight:600; line-height:1;
+}
+.switch-btn:hover{border-color:var(--ink)}
+.switch-btn .track{
+  width:32px; height:18px; border-radius:999px; background:#dcdcdc;
+  position:relative; transition:background .15s; flex:none;
+}
+.switch-btn .knob{
+  position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.35); transition:left .15s;
+}
+.switch-btn.on .track{background:var(--accent)}
+.switch-btn.on .knob{left:16px}
+.switch-note{font-size:12.5px; color:var(--muted)}
+
 .section-label{
   font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
   font-weight:700; margin:26px 0 8px;
