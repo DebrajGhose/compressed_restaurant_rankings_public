@@ -176,7 +176,15 @@
   // recomputed on every pan/zoom (zoom into a neighborhood to see its own top 10).
   // Pin numbers are the citywide rank, so they match the list below, which never
   // changes with the map.
-  var mapObj = null;
+  //
+  // The basemap is keyless vector tiles (light "Positron" style) drawn by MapLibre GL
+  // inside Leaflet. The map is built once and reused across city/type/price switches,
+  // because it is a WebGL layer and browsers cap how many WebGL contexts a page holds.
+  var BASEMAP_STYLE = "https://tiles.openfreemap.org/styles/positron";
+  var BASEMAP_CREDIT = '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> ' +
+    '<a href="https://www.openmaptiles.org/" target="_blank">&copy; OpenMapTiles</a> ' +
+    'Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
+  var mapObj = null, markerLayer = null, onMoveEnd = null;
   function buildMap() {
     var el = document.getElementById("map");
     if (typeof L === "undefined" || !el) return;        // Leaflet not loaded (offline)
@@ -184,17 +192,21 @@
       return typeof r.lat === "number" && typeof r.lng === "number";
     });
 
-    if (mapObj) { mapObj.remove(); mapObj = null; }
-    if (!all.length) { el.innerHTML = "<div style='padding:16px;color:#737373;font-size:13px'>No coordinates in the data yet.</div>"; setMapNote(""); return; }
-    el.innerHTML = "";
+    if (!all.length) {
+      if (mapObj) { mapObj.remove(); mapObj = null; markerLayer = null; }
+      el.innerHTML = "<div style='padding:16px;color:#737373;font-size:13px'>No coordinates in the data yet.</div>"; setMapNote(""); return;
+    }
+    if (!mapObj) {
+      el.innerHTML = "";
+      mapObj = L.map(el, { scrollWheelZoom: false, attributionControl: true, maxZoom: 19 });
+      if (typeof L.maplibreGL === "function")             // basemap script missing: pins still work
+        L.maplibreGL({ style: BASEMAP_STYLE, attribution: BASEMAP_CREDIT }).addTo(mapObj);
+    } else {
+      if (onMoveEnd) mapObj.off("moveend", onMoveEnd);
+      if (markerLayer) mapObj.removeLayer(markerLayer);
+    }
 
-    mapObj = L.map(el, { scrollWheelZoom: false, attributionControl: true });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap &copy; CARTO'
-    }).addTo(mapObj);
-
-    var markers = L.layerGroup().addTo(mapObj);
+    var markers = markerLayer = L.layerGroup().addTo(mapObj);
 
     function updateMarkers() {
       var bounds = mapObj.getBounds();
@@ -276,7 +288,8 @@
       return false;
     }
 
-    mapObj.on("moveend", updateMarkers);   // fires after every pan/zoom (and fitBounds)
+    onMoveEnd = updateMarkers;
+    mapObj.on("moveend", onMoveEnd);       // fires after every pan/zoom (and fitBounds)
 
     // start on the citywide top 10
     mapObj.fitBounds(all.slice(0, 10).map(function (r) { return [r.lat, r.lng]; }), { padding: [40, 40] });
@@ -290,12 +303,11 @@
 
   function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]; }); }
 
-  // Neutral "view location" link: drops a pin on OpenStreetMap (open-licensed, no
-  // third-party data-source reference). Uses coords when present, else a name search.
+  // "View location" link for a row or pin: a map search for the restaurant's name plus
+  // the city, which opens the place's own page (hours, photos, directions).
   function placeLink(r) {
-    if (typeof r.lat === "number" && typeof r.lng === "number")
-      return "https://www.openstreetmap.org/?mlat=" + r.lat + "&mlon=" + r.lng + "#map=18/" + r.lat + "/" + r.lng;
-    return "https://www.openstreetmap.org/search?query=" + encodeURIComponent(r.name + ", " + (city && city.name ? city.name : ""));
+    return "https://www.google.com/maps/search/?api=1&query=" +
+      encodeURIComponent(r.name + ", " + (city && city.name ? city.name : ""));
   }
 
   loadCity(cityId);
